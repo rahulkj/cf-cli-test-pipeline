@@ -1,0 +1,21 @@
+pivnet:
+  token: ((pivnet_token))
+  platform_automation_image_slug: platform-automation
+  platform_automation_image_version: '^5\.0\.[0-9]*$'
+  tas_slug: elastic-runtime
+  tas_version: ^2\.10\.[0-9]*$
+
+smtp:
+  from_address: someone-spammer@no-reply.com
+  to_addresses: someone-interested@example.com
+  address: ((smtp_address))
+  port: ((smtp_port))
+  username: ((smtp_credentials.username))
+  password: ((smtp_credentials.password))
+
+cf:
+  api: api.sys.example.com
+  username: admin
+  password: ((cf_admin_password))
+  org: system
+  space: system

@@ -1,0 +1,82 @@
+resource_types:
+- name: email
+  type: docker-image
+  source:
+    repository: pcfseceng/email-resource
+- name: pivnet
+  type: docker-image
+  source:
+    repository: pivotalcf/pivnet-resource
+    tag: latest-final
+
+resources:
+- name: cf-cli
+  type: pivnet
+  source:
+    api_token: ((pivnet.token))
+    product_slug: ((pivnet.tas_slug))
+    product_version: ((pivnet.tas_version))
+    sort_by: semver
+  check_every: 1h
+- name: platform-automation-image
+  type: pivnet
+  source:
+    api_token: ((pivnet.token))
+    product_slug: ((pivnet.platform_automation_image_slug))
+    product_version: ((pivnet.platform_automation_image_version))
+    sort_by: semver
+  check_every: 1h
+- name: email
+  type: email
+  source:
+    from: ((smtp.from_address))
+    to: [((smtp.to_addresses))]
+    smtp:
+      host: ((smtp.address))
+      port: ((smtp.port))
+      username: ((smtp.username))
+      password: ((smtp.password))
+
+jobs:
+- name: simple-report
+  plan:
+  - in_parallel:
+    - get: cf-cli
+      params:
+        globs:
+        - "*.zip"
+        unpack: true
+    - get: platform-automation-image
+      params:
+        unpack: true
+        globs:
+        - '*.tgz'
+
+  - task: list-all-orgs
+    image: platform-automation-image
+    params:
+      CF_API: ((cf.api))
+      CF_USERNAME: ((cf.username))
+      CF_PASSWORD: ((cf.password))
+      CF_ORG: ((cf.org))
+      CF_SPACE: ((cf.space)) 
+    config:
+      platform: linux
+      inputs:
+      - name: cf-cli
+      outputs:
+      - name: data
+      run:
+        path: bash
+        args:
+        - "-c"
+        - |
+          FILE=$(find ./cf-cli -name "*_linux_x86-64*")
+          tar zxf $FILE
+          ./cf login -a ${CF_API} --skip-ssl-validation -u ${CF_USERNAME} -p ${CF_PASSWORD} -o ${CF_ORG} -s ${CF_SPACE}
+          ./cf orgs > ./data/output.txt
+
+  - put: email
+    params:
+      subject_text: "Build finished: ${BUILD_PIPELINE_NAME}/${BUILD_JOB_NAME}/${BUILD_NAME}"
+      body: ./data/output.txt
